@@ -1,0 +1,8 @@
+{
+  "short_name": "Neon Breach",
+  "name": "Neon Breach: Official Arena",
+  "start_url": "index.html",
+  "display": "standalone",
+  "theme_color": "#00ffcc",
+  "background_color": "#000000"
+}

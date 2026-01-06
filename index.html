@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Neon Breach | Ultimate Edition</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap');
+        
+        body { margin: 0; overflow: hidden; font-family: 'Orbitron', sans-serif; background: #000; color: #00ffcc; }
+        
+        /* UI & HUD */
+        #ui { position: absolute; top: 20px; width: 100%; display: flex; justify-content: space-around; pointer-events: none; z-index: 5; text-shadow: 0 0 10px #00ffcc; }
+        #playerHUD { position: absolute; bottom: 20px; left: 20px; width: 250px; }
+        .hp-bg { width: 100%; height: 12px; background: rgba(0, 255, 204, 0.1); border: 1px solid #00ffcc; margin-top: 5px; }
+        #hp-fill { width: 100%; height: 100%; background: #00ffcc; box-shadow: 0 0 15px #00ffcc; transition: 0.1s; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; border: 2px solid #00ffcc; transform: translate(-50%, -50%); pointer-events: none; border-radius: 50%; }
+        #minimap { position: absolute; bottom: 20px; right: 20px; width: 150px; height: 150px; background: rgba(0, 255, 204, 0.1); border: 2px solid #00ffcc; border-radius: 5px; }
+
+        /* NEON LOGO */
+        .logo-container { display: flex; justify-content: center; align-items: center; margin-bottom: 10px; }
+        .nb-logo { 
+            font-size: 60px; font-weight: 900; color: #000; padding: 5px 20px; border: 4px solid #00ffcc;
+            text-shadow: -1px -1px 0 #00ffcc, 1px -1px 0 #00ffcc, -1px 1px 0 #00ffcc, 1px 1px 0 #00ffcc, 0 0 20px #00ffcc;
+            box-shadow: 0 0 20px #00ffcc, inset 0 0 20px #00ffcc; background: rgba(0, 255, 204, 0.05);
+        }
+
+        /* OVERLAYS */
+        #overlay, #gameOverOverlay { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; }
+        #overlay { background: radial-gradient(circle, #0a141e 0%, #000 100%); }
+        #gameOverOverlay { background: rgba(20, 0, 0, 0.95); display: none; color: #ff3333; }
+        
+        .menu-box { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        input { background: rgba(0,0,0,0.5); border: 2px solid #00ffcc; color: #fff; padding: 10px; font-family: 'Orbitron'; text-align: center; }
+        .btn { padding: 12px 40px; background: transparent; color: #fff; border: 2px solid #fff; cursor: pointer; font-family: 'Orbitron'; font-size: 18px; transition: 0.3s; }
+        .btn:hover, .active-map { background: #fff; color: #000; box-shadow: 0 0 20px #fff; }
+
+        /* LOADING BAR */
+        #loadingBarContainer { width: 300px; height: 10px; background: rgba(0, 255, 204, 0.1); border: 1px solid #00ffcc; margin-top: 20px; display: none; }
+        #loadingBarFill { width: 0%; height: 100%; background: #00ffcc; box-shadow: 0 0 15px #00ffcc; transition: width 0.3s; }
+
+        /* SETTINGS & LEADERBOARD */
+        #settingsMenu { display: none; background: rgba(0,0,0,0.95); border: 2px solid #00ffcc; padding: 30px; }
+        .key-row { display: flex; justify-content: space-between; width: 320px; margin: 8px 0; align-items: center; }
+        #leaderboard { margin-top: 20px; border-collapse: collapse; width: 300px; color: #00ffcc; border: 1px solid rgba(0, 255, 204, 0.3); font-size: 14px; }
+        #leaderboard th, #leaderboard td { padding: 8px; text-align: center; border: 1px solid rgba(0, 255, 204, 0.1); }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div>ID: <span id="displayUser">---</span></div>
+        <div>KILLS: <span id="kills">0</span></div>
+        <div>WEAPON: <span id="weaponName">Pistol</span></div>
+    </div>
+
+    <div id="playerHUD">SYSTEM INTEGRITY<div class="hp-bg"><div id="hp-fill"></div></div></div>
+    <canvas id="minimap"></canvas>
+    <div id="crosshair"></div>
+
+    <div id="overlay">
+        <div id="mainMenu" class="menu-box">
+            <div class="logo-container"><div class="nb-logo">NB</div></div>
+            <input type="text" id="usernameInput" placeholder="CODENAME" maxlength="12">
+            <div id="mapSelect">
+                <button class="btn active-map" onclick="selectMap(0, this)">LABYRINTH</button>
+                <button class="btn" onclick="selectMap(1, this)">COURTYARD</button>
+                <button class="btn" onclick="selectMap(2, this)">GAUNTLET</button>
+            </div>
+            <button class="btn" id="initBtn" onclick="requestStart()" style="border-color:#00ffcc; color:#00ffcc;">INITIALIZE</button>
+            <div id="loadingBarContainer"><div id="loadingBarFill"></div></div>
+            <button class="btn" onclick="toggleSettings(true)">SETTINGS</button>
+        </div>
+
+        <div id="settingsMenu" class="menu-box">
+            <h2>INPUT CONFIG</h2>
+            <div id="bindsContainer"></div>
+            <button class="btn" onclick="toggleSettings(false)">SAVE & EXIT</button>
+        </div>
+    </div>
+
+    <div id="gameOverOverlay">
+        <h1 style="color:#ff3333">CRITICAL FAILURE</h1>
+        <div style="color:#fff">FINAL KILLS: <span id="finalKills">0</span></div>
+        <table id="leaderboard">
+            <thead><tr><th>RANK</th><th>NAME</th><th>SCORE</th></tr></thead>
+            <tbody id="leaderboardBody"></tbody>
+        </table>
+        <button class="btn" style="margin-top:20px; border-color:#ff3333; color:#ff3333;" onclick="resetGame()">REBOOT</button>
+    </div>
+
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/PointerLockControls.js';
+
+        // --- STATE ---
+        let kills = 0, playerHP = 100, gameActive = false, isCrouching = false, isDashing = false, selectedMapIndex = 0;
+        const wallBlocks = [];
+        const mapData = [
+            { name: "Labyrinth", layout: [[1,1,1,1,1,1,1,1,1,1],[1,0,0,0,1,0,0,0,0,1],[1,0,1,0,1,0,1,1,0,1],[1,0,1,0,0,0,0,1,0,1],[1,0,1,1,1,1,0,1,0,1],[1,0,0,0,0,0,0,0,0,1],[1,1,1,0,1,1,1,1,0,1],[1,0,0,0,0,0,0,1,0,1],[1,0,1,1,1,1,0,0,0,1],[1,1,1,1,1,1,1,1,1,1]] },
+            { name: "Courtyard", layout: [[1,1,1,1,1,1,1,1,1,1],[1,0,0,0,0,0,0,0,0,1],[1,0,1,0,0,0,0,1,0,1],[1,0,0,0,0,0,0,0,0,1],[1,0,0,0,1,1,0,0,0,1],[1,0,0,0,1,1,0,0,0,1],[1,0,0,0,0,0,0,0,0,1],[1,0,1,0,0,0,0,1,0,1],[1,0,0,0,0,0,0,0,0,1],[1,1,1,1,1,1,1,1,1,1]] },
+            { name: "Gauntlet", layout: [[1,1,1,1,1,1,1,1,1,1],[1,0,1,0,0,0,0,1,0,1],[1,0,1,0,1,1,0,1,0,1],[1,0,0,0,0,0,0,0,0,1],[1,1,1,0,1,1,0,1,1,1],[1,0,0,0,0,0,0,0,0,1],[1,0,1,0,1,1,0,1,0,1],[1,0,1,0,0,0,0,1,0,1],[1,0,0,0,0,0,0,0,0,1],[1,1,1,1,1,1,1,1,1,1]] }
+        ];
+
+        // --- AUDIO & ASSETS ---
+        const listener = new THREE.AudioListener();
+        const shootSound = new THREE.Audio(listener);
+
+        // --- SAVED DATA ---
+        let binds = JSON.parse(localStorage.getItem('neonBinds')) || { forward:'w', backward:'s', left:'a', right:'d', jump:' ', crouch:'c', dash:'shift' };
+        let waitingForKey = null;
+
+        // --- THREE.JS ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020205);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        camera.add(listener);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+        const controls = new PointerLockControls(camera, document.body);
+        scene.add(new THREE.AmbientLight(0x444444));
+        const light = new THREE.PointLight(0x00ffcc, 100); camera.add(light);
+
+        // --- UI CORE ---
+        window.selectMap = (i, btn) => { selectedMapIndex = i; document.querySelectorAll('#mapSelect .btn').forEach(b => b.classList.remove('active-map')); btn.classList.add('active-map'); };
+        window.toggleSettings = (s) => { document.getElementById('mainMenu').style.display = s ? 'none' : 'flex'; document.getElementById('settingsMenu').style.display = s ? 'flex' : 'none'; if(s) renderBinds(); };
+
+        function renderBinds() {
+            const container = document.getElementById('bindsContainer'); container.innerHTML = '';
+            for(let a in binds) {
+                const row = document.createElement('div'); row.className = 'key-row';
+                row.innerHTML = `<span>${a.toUpperCase()}</span><button class="key-btn" id="b-${a}">${binds[a]===' '?'SPACE':binds[a].toUpperCase()}</button>`;
+                container.appendChild(row);
+                document.getElementById(`b-${a}`).onclick = (e) => { waitingForKey = a; e.target.innerText = '...'; };
+            }
+        }
+
+        function buildMap() {
+            wallBlocks.forEach(w => scene.remove(w)); wallBlocks.length = 0;
+            const layout = mapData[selectedMapIndex].layout;
+            const geo = new THREE.BoxGeometry(6, 12, 6);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x00ffcc, wireframe: true });
+            for(let z=0; z<layout.length; z++) {
+                for(let x=0; x<layout[z].length; x++) {
+                    if(layout[z][x] === 1) {
+                        const w = new THREE.Mesh(geo, mat); w.position.set(x*6 - 30, 6, z*6 - 30);
+                        scene.add(w); wallBlocks.push(w);
+                    }
+                }
+            }
+        }
+
+        // --- START & LOADING ---
+        window.requestStart = () => {
+            const initBtn = document.getElementById('initBtn');
+            const loadBar = document.getElementById('loadingBarContainer');
+            const fill = document.getElementById('loadingBarFill');
+            
+            initBtn.style.display = 'none';
+            loadBar.style.display = 'block';
+
+            const manager = new THREE.LoadingManager();
+            manager.onProgress = (u, l, t) => fill.style.width = (l/t)*100 + '%';
+            manager.onLoad = () => {
+                setTimeout(() => {
+                    document.getElementById('overlay').style.display = 'none';
+                    gameActive = true; controls.lock();
+                }, 500);
+            };
+
+            const loader = new THREE.AudioLoader(manager);
+            loader.load('assets/sounds/shoot.mp3', (b) => { shootSound.setBuffer(b); shootSound.setVolume(0.5); });
+            
+            const user = document.getElementById('usernameInput').value.trim() || "Unit-X";
+            document.getElementById('displayUser').innerText = user;
+            buildMap();
+        };
+
+        // --- GAME OVER & RESET ---
+        function triggerGameOver() {
+            gameActive = false; controls.unlock();
+            const user = document.getElementById('displayUser').innerText;
+            
+            let highScores = JSON.parse(localStorage.getItem('neonHighScores')) || [];
+            highScores.push({ name: user, score: kills });
+            highScores.sort((a,b) => b.score - a.score);
+            highScores = highScores.slice(0, 5);
+            localStorage.setItem('neonHighScores', JSON.stringify(highScores));
+
+            document.getElementById('gameOverOverlay').style.display = 'flex';
+            document.getElementById('finalKills').innerText = kills;
+            const body = document.getElementById('leaderboardBody');
+            body.innerHTML = highScores.map((s, i) => `<tr><td>#${i+1}</td><td>${s.name}</td><td>${s.score}</td></tr>`).join('');
+        }
+
+        window.resetGame = () => {
+            playerHP = 100; kills = 0;
+            document.getElementById('kills').innerText = "0";
+            document.getElementById('hp-fill').style.width = "100%";
+            document.getElementById('gameOverOverlay').style.display = 'none';
+            document.getElementById('overlay').style.display = 'flex';
+            document.getElementById('initBtn').style.display = 'block';
+            document.getElementById('loadingBarContainer').style.display = 'none';
+            camera.position.set(0, 1.5, 0);
+        };
+
+        // --- INPUTS ---
+        const keys = {f:0, b:0, l:0, r:0};
+        window.addEventListener('keydown', (e) => {
+            if(waitingForKey) { binds[waitingForKey] = e.key.toLowerCase(); localStorage.setItem('neonBinds', JSON.stringify(binds)); waitingForKey = null; renderBinds(); return; }
+            const k = e.key.toLowerCase();
+            if(k === binds.forward) keys.f = 1; if(k === binds.backward) keys.b = 1;
+            if(k === binds.left) keys.l = 1; if(k === binds.right) keys.r = 1;
+            if(k === binds.dash) isDashing = true; if(k === binds.crouch) isCrouching = true;
+            if(k === binds.jump && camera.position.y <= 1.5) vel.y = 10;
+        });
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if(k === binds.forward) keys.f = 0; if(k === binds.backward) keys.b = 0;
+            if(k === binds.left) keys.l = 0; if(k === binds.right) keys.r = 0;
+            if(k === binds.dash) isDashing = false; if(k === binds.crouch) isCrouching = false;
+        });
+        window.addEventListener('mousedown', () => {
+            if(gameActive && controls.isLocked && shootSound.buffer) {
+                if(shootSound.isPlaying) shootSound.stop(); shootSound.play();
+            }
+        });
+
+        // --- LOOP ---
+        const vel = new THREE.Vector3(), clock = new THREE.Clock();
+        const miniCtx = document.getElementById('minimap').getContext('2d');
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if(!gameActive || !controls.isLocked) return;
+            const dt = clock.getDelta();
+            const targetH = isCrouching ? 0.8 : 1.5;
+            camera.position.y += (targetH - camera.position.y) * 10 * dt;
+
+            let s = isDashing ? 18 : 9; if(isCrouching) s = 4;
+            if(keys.f) controls.moveForward(s*dt); if(keys.b) controls.moveForward(-s*dt);
+            if(keys.l) controls.moveRight(-s*dt); if(keys.r) controls.moveRight(s*dt);
+            
+            vel.y -= 30 * dt; camera.position.y += vel.y * dt;
+            if(camera.position.y < targetH) { camera.position.y = targetH; vel.y = 0; }
+
+            wallBlocks.forEach(w => {
+                if(camera.position.distanceTo(w.position) < 4) {
+                    const bounce = new THREE.Vector3().subVectors(camera.position, w.position).normalize();
+                    camera.position.addScaledVector(bounce, 0.4);
+                }
+            });
+
+            // Minimap Update
+            miniCtx.clearRect(0,0,150,150);
+            const layout = mapData[selectedMapIndex].layout;
+            const step = 150 / layout.length;
+            layout.forEach((row, z) => row.forEach((cell, x) => {
+                if(cell === 1) { miniCtx.fillStyle = "rgba(0,255,204,0.3)"; miniCtx.fillRect(x*step, z*step, step-1, step-1); }
+            }));
+            const px = ((camera.position.x + 30) / 60) * 150;
+            const pz = ((camera.position.z + 30) / 60) * 150;
+            miniCtx.fillStyle = "#fff"; miniCtx.beginPath(); miniCtx.arc(px, pz, 4, 0, Math.PI*2); miniCtx.fill();
+
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
